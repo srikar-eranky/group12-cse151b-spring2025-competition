@@ -1,8 +1,8 @@
 # @package _global_.data
 
-path: ???  # Path to the processed Zarr dataset
+path: data/cse151b-spring2025-competition/processed_data_cse151b_v2_corrupted_ssp245/processed_data_cse151b_v2_corrupted_ssp245.zarr # Path to the processed Zarr dataset
 
-input_vars: 
+input_vars:
   - "CO2"
   - "SO2"
   - "CH4"
@@ -14,7 +14,7 @@ output_vars:
   - "pr"
 target_member_id: 0
 
-train_ssps: 
+train_ssps:
   - "ssp126"
   - "ssp370"
   - "ssp585"
