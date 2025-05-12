@@ -56,7 +56,7 @@ class SimpleCNN(nn.Module):
         n_output_channels,
         kernel_size=3,
         init_dim=64,
-        depth=4,
+        depth=2,
         dropout_rate=0.2,
     ):
         super().__init__()
