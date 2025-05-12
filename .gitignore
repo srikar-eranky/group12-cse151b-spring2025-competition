@@ -12,6 +12,9 @@
 # data
 data/
 
+# submissions
+submissions/
+
 ### JupyterNotebooks ###
 *.ipynb
 notebooks/*.ipynb
