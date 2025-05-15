@@ -64,13 +64,14 @@ class SimpleCNN(nn.Module):
         # Initial convolution to expand channels
         self.initial = nn.Sequential(
             nn.Conv2d(n_input_channels, init_dim, kernel_size=kernel_size, padding=kernel_size // 2),
-            nn.BatchNorm2d(init_dim),
+            nn.Conv2d(init_dim, 32, kernel_size=kernel_size // 2),
+            nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
         )
 
         # Residual blocks with increasing feature dimensions
         self.res_blocks = nn.ModuleList()
-        current_dim = init_dim
+        current_dim = 32
 
         for i in range(depth):
             out_dim = current_dim * 2 if i < depth - 1 else current_dim
