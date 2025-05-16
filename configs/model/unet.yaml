@@ -1,0 +1,5 @@
+# Model type identifier
+type: unet
+
+# Model architecture parameters
+dropout_rate: 0.2
