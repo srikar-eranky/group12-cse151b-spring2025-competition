@@ -1,6 +1,6 @@
 # @package _global_.data
 
-path: ???  # Path to the processed Zarr dataset
+path: "./data/processed_data_cse151b_v2_corrupted_ssp245.zarr"
 
 input_vars: 
   - "CO2"
