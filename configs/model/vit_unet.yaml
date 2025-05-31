@@ -1,0 +1,4 @@
+# Model type identifier
+type: vit_unet
+
+# Model architecture parameters
