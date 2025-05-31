@@ -534,7 +534,7 @@ class OutConv(nn.Module):
 
 # Full ViT-UNet Model
 class ViT_UNet(nn.Module):
-    def __init__(self, n_input_channels, n_output_channels, base_channels=64, patch_size=16, num_transformer_blocks=2, transformer_dim=768, heads=8, dim_head=64, mlp_dim=3072, bilinear=True):
+    def __init__(self, n_input_channels, n_output_channels, base_channels=64, patch_size=16, num_transformer_blocks=2, transformer_dim=384, heads=8, dim_head=32, mlp_dim=1536, bilinear=True):
         super().__init__()
         self.in_channels = n_input_channels
         self.num_classes = n_output_channels
