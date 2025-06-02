@@ -1,0 +1,5 @@
+type: unet_temporal
+dropout_rate: 0.3
+temporal_hidden_dim: 256
+temporal: gru
+bilinear: false

@@ -5,7 +5,9 @@ import torch.nn.functional as F
 
 def get_model(cfg: DictConfig):
     # Create model based on configuration
-    model_kwargs = {k: v for k, v in cfg.model.items() if k != "type"}
+    model_kwargs = {
+        k: v for k, v in cfg.model.items() 
+        if k not in ("type", "temporal", "temporal_hidden_dim")}
     model_kwargs["n_input_channels"] = len(cfg.data.input_vars)
     model_kwargs["n_output_channels"] = len(cfg.data.output_vars)
     if cfg.model.type == "simple_cnn":
@@ -14,6 +16,8 @@ def get_model(cfg: DictConfig):
         model = UNet(**model_kwargs)
     elif cfg.model.type == "vit_unet":
         model = ViT_UNet(**model_kwargs)
+    elif cfg.model.type == "unet_temporal":
+        model = UNetTemporal(**model_kwargs)
     else:
         raise ValueError(f"Unknown model type: {cfg.model.type}")
     return model
@@ -106,6 +110,60 @@ class SimpleCNN(nn.Module):
 """
 UNET
 """
+class UNet(nn.Module):
+    def __init__(self, n_input_channels, n_output_channels, dropout_rate=0.4, bilinear=False):
+        super(UNet, self).__init__()
+        self.n_channels = n_input_channels
+        self.n_classes = n_output_channels
+        self.bilinear = bilinear
+
+        self.dropout = nn.Dropout2d(dropout_rate)
+        self.inc = (DoubleConv(n_input_channels, 64))
+        self.down1 = (DownUNET(64, 128))
+        self.down2 = (DownUNET(128, 256))
+        self.down3 = (DownUNET(256, 512))
+        factor = 2 if bilinear else 1
+        self.down4 = (DownUNET(512, 1024 // factor))
+        self.up1 = (Up(1024, 512 // factor, bilinear))
+        self.up2 = (Up(512, 256 // factor, bilinear))
+        self.up3 = (Up(256, 128 // factor, bilinear))
+        self.up4 = (Up(128, 64, bilinear))
+        self.outc = (OutConv(64, n_output_channels))
+
+    def forward(self, x):
+        x1 = self.inc(x)
+        
+        x2 = self.down1(x1)
+        x2 = self.dropout(x2)
+        
+        x3 = self.down2(x2)
+        x3 = self.dropout(x3)
+        
+        x4 = self.down3(x3)
+        x4 = self.dropout(x4)
+        
+        x5 = self.down4(x4)
+        x5 = self.dropout(x5)
+        
+        x = self.up1(x5, x4)
+        x = self.up2(x, x3)
+        x = self.up3(x, x2)
+        x = self.up4(x, x1)
+        x = self.dropout(x)
+        logits = self.outc(x)
+        return logits
+
+    def use_checkpointing(self):
+        self.inc = nn.utils.checkpoint(self.inc)
+        self.down1 = nn.utils.checkpoint(self.down1)
+        self.down2 = nn.utils.checkpoint(self.down2)
+        self.down3 = nn.utils.checkpoint(self.down3)
+        self.down4 = nn.utils.checkpoint(self.down4)
+        self.up1 = nn.utils.checkpoint(self.up1)
+        self.up2 = nn.utils.checkpoint(self.up2)
+        self.up3 = nn.utils.checkpoint(self.up3)
+        self.up4 = nn.utils.checkpoint(self.up4)
+        self.outc = nn.utils.checkpoint(self.outc)
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
@@ -126,7 +184,7 @@ class DoubleConv(nn.Module):
         return self.double_conv(x)
 
 
-class Down(nn.Module):
+class DownUNET(nn.Module):
     """Downscaling with maxpool then double conv"""
 
     def __init__(self, in_channels, out_channels):
@@ -174,61 +232,6 @@ class OutConv(nn.Module):
 
     def forward(self, x):
         return self.conv(x)
-
-class UNet(nn.Module):
-    def __init__(self, n_input_channels, n_output_channels, dropout_rate=0.4, bilinear=False):
-        super(UNet, self).__init__()
-        self.n_channels = n_input_channels
-        self.n_classes = n_output_channels
-        self.bilinear = bilinear
-
-        self.dropout = nn.Dropout2d(dropout_rate)
-        self.inc = (DoubleConv(n_input_channels, 64))
-        self.down1 = (Down(64, 128))
-        self.down2 = (Down(128, 256))
-        self.down3 = (Down(256, 512))
-        factor = 2 if bilinear else 1
-        self.down4 = (Down(512, 1024 // factor))
-        self.up1 = (Up(1024, 512 // factor, bilinear))
-        self.up2 = (Up(512, 256 // factor, bilinear))
-        self.up3 = (Up(256, 128 // factor, bilinear))
-        self.up4 = (Up(128, 64, bilinear))
-        self.outc = (OutConv(64, n_output_channels))
-
-    def forward(self, x):
-        x1 = self.inc(x)
-        
-        x2 = self.down1(x1)
-        x2 = self.dropout(x2)
-        
-        x3 = self.down2(x2)
-        x3 = self.dropout(x3)
-        
-        x4 = self.down3(x3)
-        x4 = self.dropout(x4)
-        
-        x5 = self.down4(x4)
-        x5 = self.dropout(x5)
-        
-        x = self.up1(x5, x4)
-        x = self.up2(x, x3)
-        x = self.up3(x, x2)
-        x = self.up4(x, x1)
-        x = self.dropout(x)
-        logits = self.outc(x)
-        return logits
-
-    def use_checkpointing(self):
-        self.inc = nn.utils.checkpoint(self.inc)
-        self.down1 = nn.utils.checkpoint(self.down1)
-        self.down2 = nn.utils.checkpoint(self.down2)
-        self.down3 = nn.utils.checkpoint(self.down3)
-        self.down4 = nn.utils.checkpoint(self.down4)
-        self.up1 = nn.utils.checkpoint(self.up1)
-        self.up2 = nn.utils.checkpoint(self.up2)
-        self.up3 = nn.utils.checkpoint(self.up3)
-        self.up4 = nn.utils.checkpoint(self.up4)
-        self.outc = nn.utils.checkpoint(self.outc)
 
 
 import torch
@@ -606,3 +609,34 @@ class ViT_UNet(nn.Module):
                                    diffX // 2 : output_w - (diffX - diffX // 2)]
         
         return logits
+
+"""UNet Temporal"""
+class UNetTemporal(nn.Module):
+    def __init__(self, n_input_channels, n_output_channels, temporal="gru", hidden_dim=256, **unet_kwargs):
+        super().__init__()
+        self.temporal = temporal
+        self.unet = UNet(n_input_channels, n_output_channels, **unet_kwargs)
+        if temporal == "gru":
+            self.spatial_H, self.spatial_W = 32, 64
+            self.temporal_model = nn.GRU(
+                input_size=n_output_channels * self.spatial_H * self.spatial_W,
+                hidden_size=hidden_dim,
+                batch_first=True
+            )
+            self.output_proj = nn.Linear(hidden_dim, n_output_channels * self.spatial_H * self.spatial_W)
+    def forward(self, x):
+        if x.ndim == 4:
+            x = x.unsqueeze(1) 
+        B, T, C, H, W = x.shape
+        spatial_outs = []
+        for t in range(T):
+            frame = x[:, t]  
+            out = self.unet(frame)  
+            spatial_outs.append(out)
+        out_seq = torch.stack(spatial_outs, dim=1)
+        if self.temporal == "gru":
+            flat_seq = out_seq.view(B, T, -1)
+            temporal_out, _ = self.temporal_model(flat_seq)
+            projected = self.output_proj(temporal_out)
+            out_seq = projected.view(B, T, -1, H, W)
+        return out_seq
